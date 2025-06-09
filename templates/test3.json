@@ -1,0 +1,76 @@
+{
+    "comment": "示例工作流：通过 HTTP 工具写入数据库（优化后的参数映射）",
+    "version": "1.0",
+    "startAt": "PrepareData",
+    "states": {
+        "PrepareData": {
+            "type": "pass",
+            "outputMapping": {
+                "mappings": [
+                    {
+                        "key": "name",
+                        "type": "constant",
+                        "value": "Alice"
+                    },
+                    {
+                        "key": "age",
+                        "type": "constant",
+                        "value": 30
+                    },
+                    {
+                        "key": "api_url",
+                        "type": "constant",
+                        "value": "https://example.com/api/users"
+                    }
+                ]
+            },
+            "next": "SendData"
+        },
+        "SendData": {
+            "type": "task",
+            "resource": "http",
+            "inputMapping": {
+                "mappings": [
+                    {
+                        "key": "url",
+                        "type": "jsonPath",
+                        "source": "$.api_url"
+                    },
+                    {
+                        "key": "method",
+                        "type": "constant",
+                        "value": "POST"
+                    },
+                    {
+                        "key": "headers",
+                        "type": "constant",
+                        "value": {
+                            "Content-Type": "application/json"
+                        }
+                    },
+                    {
+                        "key": "body",
+                        "type": "subMapping",
+                        "source": "$",
+                        "subMapping": [
+                            {
+                                "key": "name",
+                                "type": "jsonPath",
+                                "source": "$.name"
+                            },
+                            {
+                                "key": "age",
+                                "type": "jsonPath",
+                                "source": "$.age"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "next": "Success"
+        },
+        "Success": {
+            "type": "succeed"
+        }
+    }
+}
