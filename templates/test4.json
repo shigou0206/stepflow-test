@@ -1,0 +1,93 @@
+{
+    "comment": "示例工作流：通过 HTTP 工具写入数据库，并根据 HTTP 状态码分支",
+    "version": "1.0",
+    "startAt": "PrepareData",
+    "states": {
+        "PrepareData": {
+            "type": "pass",
+            "outputMapping": {
+                "mappings": [
+                    {
+                        "key": "name",
+                        "type": "constant",
+                        "value": "Alice"
+                    },
+                    {
+                        "key": "age",
+                        "type": "constant",
+                        "value": 30
+                    },
+                    {
+                        "key": "api_url",
+                        "type": "constant",
+                        "value": "https://example.com/api/users"
+                    }
+                ]
+            },
+            "next": "SendData"
+        },
+        "SendData": {
+            "type": "task",
+            "resource": "http",
+            "inputMapping": {
+                "mappings": [
+                    {
+                        "key": "url",
+                        "type": "jsonPath",
+                        "source": "$.api_url"
+                    },
+                    {
+                        "key": "method",
+                        "type": "constant",
+                        "value": "POST"
+                    },
+                    {
+                        "key": "headers",
+                        "type": "constant",
+                        "value": {
+                            "Content-Type": "application/json"
+                        }
+                    },
+                    {
+                        "key": "body",
+                        "type": "subMapping",
+                        "source": "$",
+                        "subMappings": [
+                            {
+                                "key": "name",
+                                "type": "jsonPath",
+                                "source": "$.name"
+                            },
+                            {
+                                "key": "age",
+                                "type": "jsonPath",
+                                "source": "$.age"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "next": "CheckStatus"
+        },
+        "CheckStatus": {
+            "type": "choice",
+            "choices": [
+                {
+                    "condition": {
+                        "variable": "$.status",
+                        "operator": "GreaterThan",
+                        "value": 299
+                    },
+                    "next": "Success"
+                }
+            ],
+            "default": "Fail"
+        },
+        "Success": {
+            "type": "succeed"
+        },
+        "Fail": {
+            "type": "fail"
+        }
+    }
+}
