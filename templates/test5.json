@@ -41,14 +41,16 @@
             "next": "Success"
           }
         ],
-        "default": "Fail"
+        "defaultNext": "Fail"
       },
       "Success": {
-        "type": "succeed"
+        "type": "succeed",
+        "end": true
       },
       "Fail": {
         "type": "fail",
-        "error": "HTTP request failed or returned non-2xx status"
+        "error": "HTTP request failed or returned non-2xx status",
+        "end": true
       }
     }
   }

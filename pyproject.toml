@@ -11,6 +11,8 @@ httpx = "^0.28.1"
 pydantic = "^2.11.5"
 requests = "^2.32.3"
 pyyaml = "^6.0.2"
+fastapi = "^0.115.14"
+uvicorn = "^0.35.0"
 
 
 [tool.poetry.group.dev.dependencies]

@@ -1,0 +1,87 @@
+{
+    "version": "1.0",
+    "startAt": "Start",
+    "states": {
+      "Start": {
+        "type": "pass",
+        "outputMapping": {
+          "mappings": [
+            {
+              "key": "msg",
+              "type": "constant",
+              "value": "Hello from parallel"
+            }
+          ]
+        },
+        "next": "ParallelBranch"
+      },
+      "ParallelBranch": {
+        "type": "parallel",
+        "maxConcurrency": 2,
+        "branches": [
+          {
+            "startAt": "Branch1",
+            "states": {
+              "Branch1": {
+                "type": "task",
+                "resource": "http",
+                "inputMapping": {
+                  "mappings": [
+                    {
+                      "key": "url",
+                      "type": "constant",
+                      "value": "https://example.com/api/log"
+                    },
+                    {
+                      "key": "method",
+                      "type": "constant",
+                      "value": "POST"
+                    },
+                    {
+                      "key": "body",
+                      "type": "jsonPath",
+                      "source": "$"
+                    }
+                  ]
+                },
+                "end": true
+              }
+            }
+          },
+          {
+            "startAt": "Branch2",
+            "states": {
+              "Branch2": {
+                "type": "task",
+                "resource": "http",
+                "inputMapping": {
+                  "mappings": [
+                    {
+                      "key": "url",
+                      "type": "constant",
+                      "value": "https://example.com/api/notify"
+                    },
+                    {
+                      "key": "method",
+                      "type": "constant",
+                      "value": "POST"
+                    },
+                    {
+                      "key": "body",
+                      "type": "jsonPath",
+                      "source": "$"
+                    }
+                  ]
+                },
+                "end": true
+              }
+            }
+          }
+        ],
+        "next": "Done"
+      },
+      "Done": {
+        "type": "succeed"
+      }
+    }
+  }

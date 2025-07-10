@@ -1,0 +1,58 @@
+version: "1.0"
+startAt: Init
+states:
+  Init:
+    type: pass
+    outputMapping:
+      mappings:
+        - key: users
+          type: constant
+          value:
+            - name: Alice
+              age: 30
+            - name: Bob
+              age: 25
+            - name: Carol
+              age: 28
+    next: ProcessUsers
+
+  ProcessUsers:
+    type: map
+    itemsPath: $.users
+    itemContextKey: item
+    maxConcurrency: 2
+    inputMapping:
+      mappings:
+        - key: url
+          type: constant
+          value: https://example.com/api/users
+        - key: method
+          type: constant
+          value: POST
+        - key: body
+          type: jsonPath
+          source: $.item
+    outputMapping:
+      mappings:
+        - key: results
+          type: subMapping
+          source: $
+          sub:
+            mappings:
+              - key: user
+                type: jsonPath
+                source: $.body
+              - key: status
+                type: jsonPath
+                source: $.status
+    iterator:
+      startAt: SendData
+      states:
+        SendData:
+          type: task
+          resource: http
+          end: true
+    next: Success
+
+  Success:
+    type: succeed
