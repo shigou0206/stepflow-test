@@ -382,7 +382,7 @@ class DatabaseManager:
             stats = {}
             
             # 模板统计
-            cursor.execute('SELECT COUNT(*) as count FROM openapi_templates WHERE status = "active"')
+            cursor.execute('SELECT COUNT(*) as count FROM api_spec_templates WHERE status = "active"')
             stats['templates'] = cursor.fetchone()['count']
             
             # API文档统计

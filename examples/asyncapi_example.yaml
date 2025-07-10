@@ -1,0 +1,330 @@
+asyncapi: 2.6.0
+info:
+  title: StepFlow AsyncAPI Example
+  version: 1.0.0
+  description: 示例异步API，包含多种协议支持
+  contact:
+    name: StepFlow Team
+    email: team@stepflow.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  websocket-server:
+    url: ws://localhost:8080
+    protocol: ws
+    description: WebSocket 服务器
+  mqtt-server:
+    url: mqtt://localhost:1883
+    protocol: mqtt
+    description: MQTT 服务器
+  kafka-server:
+    url: kafka://localhost:9092
+    protocol: kafka
+    description: Kafka 服务器
+
+channels:
+  /user/events:
+    description: 用户事件通道
+    bindings:
+      websockets:
+        method: GET
+    subscribe:
+      summary: 订阅用户事件
+      operationId: subscribeUserEvents
+      message:
+        $ref: '#/components/messages/UserEvent'
+    publish:
+      summary: 发布用户事件
+      operationId: publishUserEvent
+      message:
+        $ref: '#/components/messages/UserEvent'
+
+  /notifications:
+    description: 通知通道
+    bindings:
+      websockets:
+        method: GET
+    subscribe:
+      summary: 订阅通知
+      operationId: subscribeNotifications
+      message:
+        $ref: '#/components/messages/Notification'
+    publish:
+      summary: 发送通知
+      operationId: sendNotification
+      message:
+        $ref: '#/components/messages/Notification'
+
+  sensor/data:
+    description: 传感器数据通道
+    bindings:
+      mqtt:
+        qos: 1
+        retain: false
+    subscribe:
+      summary: 订阅传感器数据
+      operationId: subscribeSensorData
+      message:
+        $ref: '#/components/messages/SensorData'
+    publish:
+      summary: 发布传感器数据
+      operationId: publishSensorData
+      message:
+        $ref: '#/components/messages/SensorData'
+
+  order/events:
+    description: 订单事件通道
+    bindings:
+      kafka:
+        topic: order-events
+        partitions: 3
+        replicas: 2
+    subscribe:
+      summary: 订阅订单事件
+      operationId: subscribeOrderEvents
+      message:
+        $ref: '#/components/messages/OrderEvent'
+    publish:
+      summary: 发布订单事件
+      operationId: publishOrderEvent
+      message:
+        $ref: '#/components/messages/OrderEvent'
+
+  /chat/{roomId}:
+    description: 聊天室通道
+    parameters:
+      roomId:
+        description: 聊天室ID
+        schema:
+          type: string
+        location: $message.payload#/roomId
+    bindings:
+      websockets:
+        method: GET
+    subscribe:
+      summary: 加入聊天室
+      operationId: joinChatRoom
+      message:
+        $ref: '#/components/messages/ChatMessage'
+    publish:
+      summary: 发送聊天消息
+      operationId: sendChatMessage
+      message:
+        $ref: '#/components/messages/ChatMessage'
+
+components:
+  messages:
+    UserEvent:
+      name: UserEvent
+      title: 用户事件
+      summary: 用户相关事件消息
+      contentType: application/json
+      payload:
+        type: object
+        properties:
+          eventType:
+            type: string
+            enum: [login, logout, register, update]
+          userId:
+            type: string
+          timestamp:
+            type: string
+            format: date-time
+          data:
+            type: object
+        required:
+          - eventType
+          - userId
+          - timestamp
+
+    Notification:
+      name: Notification
+      title: 通知消息
+      summary: 系统通知消息
+      contentType: application/json
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            enum: [info, warning, error, success]
+          title:
+            type: string
+          message:
+            type: string
+          userId:
+            type: string
+          timestamp:
+            type: string
+            format: date-time
+        required:
+          - type
+          - title
+          - message
+          - timestamp
+
+    SensorData:
+      name: SensorData
+      title: 传感器数据
+      summary: IoT传感器数据消息
+      contentType: application/json
+      payload:
+        type: object
+        properties:
+          sensorId:
+            type: string
+          sensorType:
+            type: string
+            enum: [temperature, humidity, pressure, motion]
+          value:
+            type: number
+          unit:
+            type: string
+          timestamp:
+            type: string
+            format: date-time
+          location:
+            type: object
+            properties:
+              latitude:
+                type: number
+              longitude:
+                type: number
+        required:
+          - sensorId
+          - sensorType
+          - value
+          - timestamp
+
+    OrderEvent:
+      name: OrderEvent
+      title: 订单事件
+      summary: 电商订单相关事件
+      contentType: application/json
+      payload:
+        type: object
+        properties:
+          eventType:
+            type: string
+            enum: [created, paid, shipped, delivered, cancelled]
+          orderId:
+            type: string
+          userId:
+            type: string
+          amount:
+            type: number
+          currency:
+            type: string
+            default: USD
+          timestamp:
+            type: string
+            format: date-time
+          metadata:
+            type: object
+        required:
+          - eventType
+          - orderId
+          - userId
+          - amount
+          - timestamp
+
+    ChatMessage:
+      name: ChatMessage
+      title: 聊天消息
+      summary: 实时聊天消息
+      contentType: application/json
+      payload:
+        type: object
+        properties:
+          roomId:
+            type: string
+          userId:
+            type: string
+          username:
+            type: string
+          message:
+            type: string
+          messageType:
+            type: string
+            enum: [text, image, file, system]
+          timestamp:
+            type: string
+            format: date-time
+        required:
+          - roomId
+          - userId
+          - message
+          - timestamp
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - username
+        - email
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              productId:
+                type: string
+              quantity:
+                type: integer
+              price:
+                type: number
+        totalAmount:
+          type: number
+        status:
+          type: string
+          enum: [pending, paid, shipped, delivered, cancelled]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - items
+        - totalAmount
+        - status
+
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    oauth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://example.com/oauth/authorize
+          tokenUrl: https://example.com/oauth/token
+          scopes:
+            read: 读取权限
+            write: 写入权限 
