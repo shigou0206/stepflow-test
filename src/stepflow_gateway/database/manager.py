@@ -269,7 +269,9 @@ class DatabaseManager:
         """获取端点"""
         with self.get_cursor() as cursor:
             cursor.execute('''
-                SELECT e.*, d.name as api_name, d.base_url
+                SELECT e.id, e.api_document_id, e.endpoint_name, e.endpoint_type, e.method, e.operation_type,
+                       e.description, e.parameters, e.request_schema, e.response_schema, e.security,
+                       e.status, e.created_at, e.updated_at, d.name as api_name, d.base_url
                 FROM api_endpoints e
                 JOIN api_documents d ON e.api_document_id = d.id
                 WHERE e.id = ?
@@ -288,19 +290,23 @@ class DatabaseManager:
         with self.get_cursor() as cursor:
             if api_document_id:
                 cursor.execute('''
-                    SELECT e.*, d.name as api_name, d.base_url
+                    SELECT e.id, e.api_document_id, e.endpoint_name, e.endpoint_type, e.method, e.operation_type,
+                           e.description, e.parameters, e.request_schema, e.response_schema, e.security,
+                           e.status, e.created_at, e.updated_at, d.name as api_name, d.base_url
                     FROM api_endpoints e
                     JOIN api_documents d ON e.api_document_id = d.id
                     WHERE e.api_document_id = ? AND e.status = ?
-                    ORDER BY e.path, e.method
+                    ORDER BY e.endpoint_name, e.method
                 ''', (api_document_id, status))
             else:
                 cursor.execute('''
-                    SELECT e.*, d.name as api_name, d.base_url
+                    SELECT e.id, e.api_document_id, e.endpoint_name, e.endpoint_type, e.method, e.operation_type,
+                           e.description, e.parameters, e.request_schema, e.response_schema, e.security,
+                           e.status, e.created_at, e.updated_at, d.name as api_name, d.base_url
                     FROM api_endpoints e
                     JOIN api_documents d ON e.api_document_id = d.id
                     WHERE e.status = ?
-                    ORDER BY d.name, e.path, e.method
+                    ORDER BY d.name, e.endpoint_name, e.method
                 ''', (status,))
             
             results = []

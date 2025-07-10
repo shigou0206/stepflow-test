@@ -323,7 +323,9 @@ class DatabaseManager:
         """获取端点"""
         with self.get_cursor() as cursor:
             cursor.execute('''
-                SELECT e.*, d.spec_type 
+                SELECT e.id, e.api_document_id, e.endpoint_name, e.endpoint_type, e.method, e.operation_type,
+                       e.description, e.parameters, e.request_schema, e.response_schema, e.security,
+                       e.status, e.created_at, e.updated_at, d.spec_type 
                 FROM api_endpoints e
                 JOIN api_documents d ON e.api_document_id = d.id
                 WHERE e.id = ?
@@ -347,7 +349,9 @@ class DatabaseManager:
         with self.get_cursor() as cursor:
             if api_document_id:
                 cursor.execute('''
-                    SELECT e.*, d.spec_type 
+                    SELECT e.id, e.api_document_id, e.endpoint_name, e.endpoint_type, e.method, e.operation_type,
+                           e.description, e.parameters, e.request_schema, e.response_schema, e.security,
+                           e.status, e.created_at, e.updated_at, d.spec_type 
                     FROM api_endpoints e
                     JOIN api_documents d ON e.api_document_id = d.id
                     WHERE e.api_document_id = ? AND e.status = 'active'
@@ -355,7 +359,9 @@ class DatabaseManager:
                 ''', (api_document_id,))
             elif spec_type:
                 cursor.execute('''
-                    SELECT e.*, d.spec_type 
+                    SELECT e.id, e.api_document_id, e.endpoint_name, e.endpoint_type, e.method, e.operation_type,
+                           e.description, e.parameters, e.request_schema, e.response_schema, e.security,
+                           e.status, e.created_at, e.updated_at, d.spec_type 
                     FROM api_endpoints e
                     JOIN api_documents d ON e.api_document_id = d.id
                     WHERE d.spec_type = ? AND e.status = 'active'
@@ -363,7 +369,9 @@ class DatabaseManager:
                 ''', (spec_type,))
             else:
                 cursor.execute('''
-                    SELECT e.*, d.spec_type 
+                    SELECT e.id, e.api_document_id, e.endpoint_name, e.endpoint_type, e.method, e.operation_type,
+                           e.description, e.parameters, e.request_schema, e.response_schema, e.security,
+                           e.status, e.created_at, e.updated_at, d.spec_type 
                     FROM api_endpoints e
                     JOIN api_documents d ON e.api_document_id = d.id
                     WHERE e.status = 'active'

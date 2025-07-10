@@ -185,9 +185,9 @@ class AuthIntegrationTest:
         
         # 2. 查找对应的端点
         self.cursor.execute('''
-            SELECT e.id, e.api_document_id, e.path, e.method, e.summary
+            SELECT e.id, e.api_document_id, e.endpoint_name, e.method, e.summary
             FROM api_endpoints e
-            WHERE e.path = ? AND e.method = ? AND e.status = 'active'
+            WHERE e.endpoint_name = ? AND e.method = ? AND e.status = 'active'
         ''', (request_data['path'], request_data['method']))
         
         endpoint = self.cursor.fetchone()
@@ -198,7 +198,7 @@ class AuthIntegrationTest:
         endpoint_id = endpoint['id']
         api_document_id = endpoint['api_document_id']
         
-        print(f"   找到端点: {endpoint['path']} {endpoint['method']}")
+        print(f"   找到端点: {endpoint['endpoint_name']} {endpoint['method']}")
         print(f"   端点描述: {endpoint['summary']}")
         
         # 3. 获取认证配置

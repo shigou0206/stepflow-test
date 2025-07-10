@@ -134,7 +134,7 @@ class ApiManager:
                 ''', (
                     endpoint_id,
                     document_id,
-                    endpoint['path'],
+                    endpoint['endpoint_name'],
                     'http',
                     endpoint['method'],
                     endpoint['method'].lower(),
@@ -149,7 +149,7 @@ class ApiManager:
             
             saved_endpoints.append({
                 'id': endpoint_id,
-                'path': endpoint['path'],
+                'path': endpoint['endpoint_name'],
                 'method': endpoint['method'],
                 'operation_id': endpoint['operation_id'],
                 'summary': endpoint['summary']
@@ -204,7 +204,9 @@ class ApiManager:
         """获取端点信息"""
         with self.db_manager.get_cursor() as cursor:
             cursor.execute('''
-                SELECT e.*, d.name as api_name, d.base_url
+                SELECT e.id, e.api_document_id, e.endpoint_name, e.endpoint_type, e.method, e.operation_type,
+                       e.description, e.parameters, e.request_schema, e.response_schema, e.security,
+                       e.status, e.created_at, e.updated_at, d.name as api_name, d.base_url
                 FROM api_endpoints e
                 JOIN api_documents d ON e.api_document_id = d.id
                 WHERE e.id = ?
@@ -220,18 +222,22 @@ class ApiManager:
         with self.db_manager.get_cursor() as cursor:
             if api_document_id:
                 cursor.execute('''
-                    SELECT e.*, d.name as api_name, d.base_url
+                    SELECT e.id, e.api_document_id, e.endpoint_name, e.endpoint_type, e.method, e.operation_type,
+                           e.description, e.parameters, e.request_schema, e.response_schema, e.security,
+                           e.status, e.created_at, e.updated_at, d.name as api_name, d.base_url
                     FROM api_endpoints e
                     JOIN api_documents d ON e.api_document_id = d.id
                     WHERE e.api_document_id = ?
-                    ORDER BY e.path, e.method
+                    ORDER BY e.endpoint_name, e.method
                 ''', (api_document_id,))
             else:
                 cursor.execute('''
-                    SELECT e.*, d.name as api_name, d.base_url
+                    SELECT e.id, e.api_document_id, e.endpoint_name, e.endpoint_type, e.method, e.operation_type,
+                           e.description, e.parameters, e.request_schema, e.response_schema, e.security,
+                           e.status, e.created_at, e.updated_at, d.name as api_name, d.base_url
                     FROM api_endpoints e
                     JOIN api_documents d ON e.api_document_id = d.id
-                    ORDER BY e.path, e.method
+                    ORDER BY e.endpoint_name, e.method
                 ''')
             
             endpoints = [dict(row) for row in cursor.fetchall()]
@@ -253,7 +259,7 @@ class ApiManager:
                 if api_doc and api_doc.get('openapi_content'):
                     try:
                         openapi_doc = json.loads(api_doc['openapi_content'])
-                        path_info = openapi_doc.get('paths', {}).get(endpoint['path'], {})
+                        path_info = openapi_doc.get('paths', {}).get(endpoint['endpoint_name'], {})
                         operation_info = path_info.get(endpoint['method'].lower(), {})
                         
                         # 获取参数信息
@@ -299,14 +305,14 @@ class ApiManager:
             
             # 首先尝试直接匹配（Flutter 端传递实际路径值，如 /pet/1）
             for endpoint in endpoints:
-                if self._match_path(endpoint['path'], path) and endpoint['method'] == method.upper():
+                if self._match_path(endpoint['endpoint_name'], path) and endpoint['method'] == method.upper():
                     matched_endpoint = endpoint
                     break
             
             # 如果没有找到匹配，尝试匹配包含占位符的路径（Flutter 端传递 /pet/{petId}）
             if not matched_endpoint:
                 for endpoint in endpoints:
-                    if endpoint['path'] == path and endpoint['method'] == method.upper():
+                    if endpoint['endpoint_name'] == path and endpoint['method'] == method.upper():
                         matched_endpoint = endpoint
                         break
             
@@ -377,7 +383,7 @@ class ApiManager:
         api_doc = self.get_api(endpoint['api_document_id'])
         
         # 路径参数替换
-        path = endpoint['path']
+        path = endpoint['endpoint_name']
         params = dict(request_data.get('params', {})) if request_data.get('params') else {}
         path_params = dict(request_data.get('path_params', {})) if request_data.get('path_params') else {}
         
@@ -702,7 +708,7 @@ class ApiManager:
         """获取最近的 API 调用"""
         with self.db_manager.get_cursor() as cursor:
             cursor.execute('''
-                SELECT l.*, e.path, e.method, d.name as api_name
+                SELECT l.*, e.endpoint_name, e.method, d.name as api_name
                 FROM api_call_logs l
                 JOIN api_endpoints e ON l.api_endpoint_id = e.id
                 JOIN api_documents d ON e.api_document_id = d.id
@@ -716,7 +722,7 @@ class ApiManager:
         """获取错误日志"""
         with self.db_manager.get_cursor() as cursor:
             cursor.execute('''
-                SELECT l.*, e.path, e.method, d.name as api_name
+                SELECT l.*, e.endpoint_name, e.method, d.name as api_name
                 FROM api_call_logs l
                 JOIN api_endpoints e ON l.api_endpoint_id = e.id
                 JOIN api_documents d ON e.api_document_id = d.id
@@ -760,7 +766,7 @@ class ApiManager:
                         'total_endpoints': len(endpoints),
                         'active_endpoints': len(active_endpoints),
                         'endpoint_details': [
-                            {'path': ep['path'], 'method': ep['method'], 'status': ep['status']}
+                            {'path': ep['endpoint_name'], 'method': ep['method'], 'status': ep['status']}
                             for ep in endpoints
                         ]
                     }),
