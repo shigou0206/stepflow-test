@@ -71,17 +71,11 @@ class AuthIntegrationTest:
         
         # 2. 注册 OpenAPI 模板
         template_id = str(uuid.uuid4())
+        now = datetime.now().isoformat()
         self.cursor.execute('''
-            INSERT INTO openapi_templates (id, name, content, status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (
-            template_id,
-            'Payment API Template',
-            json.dumps(openapi_content),
-            'active',
-            datetime.now().isoformat(),
-            datetime.now().isoformat()
-        ))
+            INSERT INTO api_spec_templates (id, name, spec_type, content, version, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (template_id, 'Test API', 'openapi', json.dumps(openapi_content), '3.0.0', 'active', now, now))
         
         # 3. 创建 API 文档
         doc_id = str(uuid.uuid4())

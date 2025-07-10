@@ -33,8 +33,9 @@ def main():
     print()
     
     try:
+        # 使用相对路径启动应用
         uvicorn.run(
-            "src.stepflow_gateway.web.app:app",
+            "stepflow_gateway.web.app:app",
             host=args.host,
             port=args.port,
             reload=args.reload,

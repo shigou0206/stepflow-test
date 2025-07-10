@@ -15,7 +15,7 @@ class DatabaseConfig:
     path: str = "stepflow_gateway.db"
     timeout: int = 30
     check_same_thread: bool = False
-    isolation_level: Optional[str] = None
+    isolation_level: Optional[str] = "IMMEDIATE"
 
 
 @dataclass

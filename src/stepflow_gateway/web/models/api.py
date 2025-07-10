@@ -14,6 +14,23 @@ class OpenApiRegisterRequest(BaseModel):
     base_url: Optional[str] = None
 
 
+class AsyncApiRegisterRequest(BaseModel):
+    """AsyncAPI 注册请求"""
+    name: str
+    asyncapi_content: str
+    version: Optional[str] = None
+    base_url: Optional[str] = None
+
+
+class ApiRegisterRequest(BaseModel):
+    """通用 API 注册请求"""
+    name: str
+    content: str
+    spec_type: str  # "openapi" 或 "asyncapi"
+    version: Optional[str] = None
+    base_url: Optional[str] = None
+
+
 class ApiCallRequest(BaseModel):
     """API 调用请求"""
     endpoint_id: str

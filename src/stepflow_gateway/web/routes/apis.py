@@ -5,8 +5,8 @@ API 管理路由
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional
 from ..models.api import (
-    OpenApiRegisterRequest, ApiResponse, ApiSummaryResponse,
-    ApiCompleteResponse
+    OpenApiRegisterRequest, AsyncApiRegisterRequest, ApiRegisterRequest,
+    ApiResponse, ApiSummaryResponse, ApiCompleteResponse
 )
 from ..models.common import SuccessResponse, ErrorResponse
 from ..dependencies import get_gateway
@@ -15,7 +15,38 @@ from stepflow_gateway.core.gateway import StepFlowGateway
 router = APIRouter(prefix="/apis", tags=["API 管理"])
 
 
-@router.post("/register", response_model=SuccessResponse)
+@router.post("/register/asyncapi", response_model=SuccessResponse)
+async def register_asyncapi(
+    request: AsyncApiRegisterRequest,
+    gateway: StepFlowGateway = Depends(get_gateway)
+):
+    """注册 AsyncAPI 文档"""
+    try:
+        result = gateway.register_api(
+            name=request.name,
+            content=request.asyncapi_content,
+            spec_type="asyncapi",
+            version=request.version,
+            base_url=request.base_url
+        )
+        if result.get('success'):
+            return SuccessResponse(
+                message="AsyncAPI 注册成功",
+                data={"api_id": result["document_id"]}
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get('error', 'AsyncAPI 注册失败')
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.post("/register/openapi", response_model=SuccessResponse)
 async def register_openapi(
     request: OpenApiRegisterRequest,
     gateway: StepFlowGateway = Depends(get_gateway)
@@ -24,7 +55,39 @@ async def register_openapi(
     try:
         result = gateway.register_api(
             name=request.name,
-            openapi_content=request.openapi_content,
+            content=request.openapi_content,
+            spec_type="openapi",
+            version=request.version,
+            base_url=request.base_url
+        )
+        if result.get('success'):
+            return SuccessResponse(
+                message="OpenAPI 注册成功",
+                data={"api_id": result["document_id"]}
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get('error', 'OpenAPI 注册失败')
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.post("/register", response_model=SuccessResponse)
+async def register_api(
+    request: ApiRegisterRequest,
+    gateway: StepFlowGateway = Depends(get_gateway)
+):
+    """注册 API 文档（支持 OpenAPI 和 AsyncAPI）"""
+    try:
+        result = gateway.register_api(
+            name=request.name,
+            content=request.content,
+            spec_type=request.spec_type,
             version=request.version,
             base_url=request.base_url
         )

@@ -392,15 +392,15 @@ def get_openapi_doc(api_id: str):
     api = gateway.get_api(api_id)
     if not api:
         raise HTTPException(status_code=404, detail="API not found")
-    # openapi_content 可能在 openapi_templates 或 api_documents
-    # 先查 api_documents，再查 openapi_templates
+    # openapi_content 可能在 api_spec_templates 或 api_documents
+    # 先查 api_documents，再查 api_spec_templates
     openapi_content = api.get("openapi_content") or api.get("content")
     if not openapi_content:
         # 兼容老数据结构
         from ..database.manager import DatabaseManager
         db = gateway.db_manager
         with db.get_cursor() as cursor:
-            cursor.execute("SELECT content FROM openapi_templates WHERE id = ?", (api.get("template_id"),))
+            cursor.execute("SELECT content FROM api_spec_templates WHERE id = ?", (api.get("template_id"),))
             row = cursor.fetchone()
             if row:
                 openapi_content = row[0]
@@ -423,7 +423,7 @@ def get_api_tags(api_id: str):
         if not openapi_content:
             db = gateway.db_manager
             with db.get_cursor() as cursor:
-                cursor.execute("SELECT content FROM openapi_templates WHERE id = ?", (api.get("template_id"),))
+                cursor.execute("SELECT content FROM api_spec_templates WHERE id = ?", (api.get("template_id"),))
                 row = cursor.fetchone()
                 if row:
                     openapi_content = row[0]
@@ -475,7 +475,7 @@ def get_api_summary(api_id: str):
 def list_templates():
     """列出所有 OpenAPI 模板（template），用于前端展示"""
     with gateway.db_manager.get_cursor() as cursor:
-        cursor.execute("SELECT id, name, content, status, created_at, updated_at FROM openapi_templates ORDER BY created_at DESC")
+        cursor.execute("SELECT id, name, content, status, created_at, updated_at FROM api_spec_templates ORDER BY created_at DESC")
         templates = [dict(row) for row in cursor.fetchall()]
     return {"success": True, "templates": templates}
 
@@ -492,7 +492,7 @@ def get_api_complete_info(api_id: str):
         template_info = None
         if api.get("template_id"):
             with gateway.db_manager.get_cursor() as cursor:
-                cursor.execute("SELECT id, name, content, status, created_at, updated_at FROM openapi_templates WHERE id = ?", (api["template_id"],))
+                cursor.execute("SELECT id, name, content, status, created_at, updated_at FROM api_spec_templates WHERE id = ?", (api["template_id"],))
                 row = cursor.fetchone()
                 if row:
                     template_info = dict(row)
@@ -533,7 +533,7 @@ def get_api_complete_info(api_id: str):
         return {"success": True, "complete_info": complete_info}
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取完整信息失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取API完整信息失败: {str(e)}")
 
 @app.get("/templates/{template_id}/complete")
 def get_template_complete_info(template_id: str):
@@ -541,7 +541,7 @@ def get_template_complete_info(template_id: str):
     try:
         # 获取模板信息
         with gateway.db_manager.get_cursor() as cursor:
-            cursor.execute("SELECT id, name, content, status, created_at, updated_at FROM openapi_templates WHERE id = ?", (template_id,))
+            cursor.execute("SELECT id, name, content, status, created_at, updated_at FROM api_spec_templates WHERE id = ?", (template_id,))
             row = cursor.fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="Template not found")

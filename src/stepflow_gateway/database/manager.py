@@ -32,6 +32,10 @@ class DatabaseManager:
                 check_same_thread=self.config.check_same_thread,
                 isolation_level=self.config.isolation_level
             )
+            # 启用外键约束
+            self._connection.execute("PRAGMA foreign_keys = ON")
+            # 设置 WAL 模式以提高并发性能
+            self._connection.execute("PRAGMA journal_mode = WAL")
             self._connection.row_factory = sqlite3.Row
         return self._connection
     
@@ -81,18 +85,35 @@ class DatabaseManager:
         
         with self.get_cursor() as cursor:
             cursor.execute('''
-                INSERT INTO openapi_templates (id, name, content, status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (template_id, name, content, 'active', now, now))
+                INSERT INTO api_spec_templates (id, name, spec_type, content, version, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (template_id, name, 'openapi', content, '3.0.0', 'active', now, now))
         
         self.logger.info(f"创建模板: {name} (ID: {template_id})")
+        return template_id
+    
+    def create_api_spec_template(self, name: str, content: str, spec_type: str = "openapi") -> str:
+        """创建 API 规范模板（支持 OpenAPI 和 AsyncAPI）"""
+        template_id = str(uuid.uuid4())
+        now = datetime.now().isoformat()
+        
+        # 根据规范类型设置默认版本
+        default_version = "3.0.0" if spec_type == "openapi" else "2.6.0"
+        
+        with self.get_cursor() as cursor:
+            cursor.execute('''
+                INSERT INTO api_spec_templates (id, name, spec_type, content, version, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (template_id, name, spec_type, content, default_version, 'active', now, now))
+        
+        self.logger.info(f"创建{spec_type}模板: {name} (ID: {template_id})")
         return template_id
     
     def get_template(self, template_id: str) -> Optional[Dict[str, Any]]:
         """获取模板"""
         with self.get_cursor() as cursor:
             cursor.execute('''
-                SELECT * FROM openapi_templates WHERE id = ?
+                SELECT * FROM api_spec_templates WHERE id = ?
             ''', (template_id,))
             
             row = cursor.fetchone()
@@ -102,7 +123,7 @@ class DatabaseManager:
         """列出模板"""
         with self.get_cursor() as cursor:
             cursor.execute('''
-                SELECT * FROM openapi_templates WHERE status = ? ORDER BY created_at DESC
+                SELECT * FROM api_spec_templates WHERE status = ? ORDER BY created_at DESC
             ''', (status,))
             
             return [dict(row) for row in cursor.fetchall()]
@@ -129,7 +150,7 @@ class DatabaseManager:
         
         with self.get_cursor() as cursor:
             cursor.execute(f'''
-                UPDATE openapi_templates SET {', '.join(updates)} WHERE id = ?
+                UPDATE api_spec_templates SET {', '.join(updates)} WHERE id = ?
             ''', params)
             
             return cursor.rowcount > 0
@@ -138,23 +159,23 @@ class DatabaseManager:
         """删除模板"""
         with self.get_cursor() as cursor:
             cursor.execute('''
-                UPDATE openapi_templates SET status = 'deleted', updated_at = ? WHERE id = ?
+                UPDATE api_spec_templates SET status = 'deleted', updated_at = ? WHERE id = ?
             ''', (datetime.now().isoformat(), template_id))
             
             return cursor.rowcount > 0
     
     # API 文档管理
     def create_api_document(self, template_id: str, name: str, version: str = None, 
-                           base_url: str = None) -> str:
+                           base_url: str = None, spec_type: str = "openapi", status: str = "active") -> str:
         """创建 API 文档"""
         doc_id = str(uuid.uuid4())
         now = datetime.now().isoformat()
         
         with self.get_cursor() as cursor:
             cursor.execute('''
-                INSERT INTO api_documents (id, template_id, name, version, base_url, status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (doc_id, template_id, name, version, base_url, 'active', now, now))
+                INSERT INTO api_documents (id, template_id, name, spec_type, version, base_url, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (doc_id, template_id, name, spec_type, version, base_url, status, now, now))
         
         self.logger.info(f"创建API文档: {name} (ID: {doc_id})")
         return doc_id
@@ -165,7 +186,7 @@ class DatabaseManager:
             cursor.execute('''
                 SELECT d.*, t.name as template_name, t.content as template_content
                 FROM api_documents d
-                JOIN openapi_templates t ON d.template_id = t.id
+                JOIN api_spec_templates t ON d.template_id = t.id
                 WHERE d.id = ?
             ''', (doc_id,))
             
@@ -178,7 +199,7 @@ class DatabaseManager:
             cursor.execute('''
                 SELECT d.*, t.name as template_name
                 FROM api_documents d
-                JOIN openapi_templates t ON d.template_id = t.id
+                JOIN api_spec_templates t ON d.template_id = t.id
                 WHERE d.status = ? ORDER BY d.created_at DESC
             ''', (status,))
             
@@ -202,6 +223,46 @@ class DatabaseManager:
                   description, tags_json, 'active', now, now))
         
         self.logger.info(f"创建端点: {method} {path} (ID: {endpoint_id})")
+        return endpoint_id
+    
+    def create_api_endpoint(self, api_document_id: str, path: str, method: str, 
+                           summary: str = None, description: str = None, 
+                           parameters: List[Dict[str, Any]] = None,
+                           request_body: Dict[str, Any] = None,
+                           responses: Dict[str, Any] = None,
+                           tags: List[str] = None, operation_id: str = None,
+                           security: List[Dict[str, Any]] = None,
+                           spec_type: str = "openapi",
+                           operation_type: str = None,
+                           protocol: str = None,
+                           channel_name: str = None) -> str:
+        """创建 API 端点（支持 AsyncAPI 字段）"""
+        endpoint_id = str(uuid.uuid4())
+        now = datetime.now().isoformat()
+        
+        # 处理 JSON 字段
+        parameters_json = json.dumps(parameters) if parameters else None
+        request_body_json = json.dumps(request_body) if request_body else None
+        responses_json = json.dumps(responses) if responses else None
+        tags_json = json.dumps(tags) if tags else None
+        security_json = json.dumps(security) if security else None
+        
+        # 对于 AsyncAPI，使用 channel_name 作为 endpoint_name
+        endpoint_name = channel_name if channel_name else path
+        endpoint_type = protocol if protocol else "http"
+        
+        with self.get_cursor() as cursor:
+            cursor.execute('''
+                INSERT INTO api_endpoints 
+                (id, api_document_id, endpoint_name, endpoint_type, method, operation_type,
+                 description, parameters, request_schema, response_schema, security, 
+                 status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (endpoint_id, api_document_id, endpoint_name, endpoint_type, method, operation_type,
+                  description, parameters_json, request_body_json, responses_json, security_json,
+                  'active', now, now))
+        
+        self.logger.info(f"创建端点: {method} {endpoint_name} (ID: {endpoint_id})")
         return endpoint_id
     
     def get_endpoint(self, endpoint_id: str) -> Optional[Dict[str, Any]]:

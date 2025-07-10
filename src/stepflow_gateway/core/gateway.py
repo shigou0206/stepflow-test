@@ -8,9 +8,11 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 
 from .config import GatewayConfig, load_config
+from .registry import ApiSpecRegistry
 from ..database.manager import DatabaseManager
 from ..auth.manager import AuthManager
 from ..api.manager import ApiManager
+from ..plugins import register_plugins
 
 
 class StepFlowGateway:
@@ -19,6 +21,12 @@ class StepFlowGateway:
     def __init__(self, config: Optional[GatewayConfig] = None):
         self.config = config or load_config()
         self.logger = self._setup_logging()
+        
+        # 初始化插件注册器
+        self.registry = ApiSpecRegistry()
+        
+        # 注册插件
+        register_plugins(self.registry)
         
         # 初始化组件
         self.db_manager = DatabaseManager(self.config.database)
@@ -106,12 +114,28 @@ class StepFlowGateway:
         except Exception as e:
             self.logger.warning(f"创建默认用户失败: {e}")
     
-    # OpenAPI 文档管理
-    def register_api(self, name: str, openapi_content: str, version: str = None, 
+    # API 文档管理
+    def register_api(self, name: str, content: str, spec_type: str = "openapi", version: str = None, 
                     base_url: str = None) -> Dict[str, Any]:
         """注册 API"""
         try:
-            result = self.api_manager.register_api(name, openapi_content, version, base_url)
+            # 检查是否支持该规范类型
+            if spec_type not in self.registry.list_specs():
+                return {
+                    'success': False,
+                    'error': f"不支持的规范类型: {spec_type}"
+                }
+            
+            # 根据规范类型选择不同的处理方式
+            if spec_type == "openapi":
+                result = self.api_manager.register_api(name, content, version, base_url)
+            elif spec_type == "asyncapi":
+                result = self._register_asyncapi(name, content, version, base_url)
+            else:
+                return {
+                    'success': False,
+                    'error': f"不支持的规范类型: {spec_type}"
+                }
             
             if result['success']:
                 self.logger.info(f"API注册成功: {name} (ID: {result['document_id']})")
@@ -123,6 +147,100 @@ class StepFlowGateway:
         except Exception as e:
             self.logger.error(f"API注册异常: {e}")
             return {'success': False, 'error': str(e)}
+    
+    def _register_asyncapi(self, name: str, content: str, version: str = None, 
+                          base_url: str = None) -> Dict[str, Any]:
+        """注册 AsyncAPI 文档"""
+        try:
+            # 获取 AsyncAPI 解析器
+            parser_class = self.registry.get_parser("asyncapi")
+            if not parser_class:
+                return {
+                    'success': False,
+                    'error': "AsyncAPI 解析器未注册"
+                }
+            
+            # 解析 AsyncAPI 文档
+            parser = parser_class()
+            spec = parser.parse(content, name=name)
+            
+            # 验证规范
+            if not spec.validate():
+                return {
+                    'success': False,
+                    'error': "AsyncAPI 规范验证失败"
+                }
+            
+            # 保存到数据库
+            template_id = self._save_asyncapi_template(name, content)
+            document_id = self._save_asyncapi_document(template_id, name, version, base_url, spec)
+            endpoints = self._extract_and_save_asyncapi_endpoints(spec, document_id)
+            
+            return {
+                'success': True,
+                'template_id': template_id,
+                'document_id': document_id,
+                'endpoints': endpoints
+            }
+            
+        except Exception as e:
+            self.logger.error(f"AsyncAPI 注册失败: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def _save_asyncapi_template(self, name: str, content: str) -> str:
+        """保存 AsyncAPI 模板"""
+        return self.db_manager.create_api_spec_template(
+            name=name,
+            content=content,
+            spec_type="asyncapi"
+        )
+    
+    def _save_asyncapi_document(self, template_id: str, name: str, version: str, 
+                               base_url: str, spec) -> str:
+        """保存 AsyncAPI 文档"""
+        return self.db_manager.create_api_document(
+            template_id=template_id,
+            name=name,
+            version=version or spec.version,
+            base_url=base_url,
+            spec_type="asyncapi",
+            status="active"
+        )
+    
+    def _extract_and_save_asyncapi_endpoints(self, spec, document_id: str) -> List[Dict[str, Any]]:
+        """提取并保存 AsyncAPI 端点"""
+        endpoints = spec.extract_endpoints(spec.content)
+        saved_endpoints = []
+        
+        for endpoint in endpoints:
+            endpoint_id = self.db_manager.create_api_endpoint(
+                api_document_id=document_id,
+                path=endpoint.get('channel_name', ''),
+                method=endpoint.get('method', ''),
+                summary=endpoint.get('description', ''),
+                description=endpoint.get('description', ''),
+                parameters=endpoint.get('parameters', []),
+                request_body=endpoint.get('request_schema', {}),
+                responses=endpoint.get('response_schema', {}),
+                tags=endpoint.get('tags', []),
+                operation_id=endpoint.get('operation_id', ''),
+                security=endpoint.get('security', []),
+                spec_type="asyncapi",
+                operation_type=endpoint.get('operation_type', ''),
+                protocol=endpoint.get('protocol', ''),
+                channel_name=endpoint.get('channel_name', '')
+            )
+            saved_endpoints.append({
+                'id': endpoint_id,
+                'path': endpoint.get('channel_name', ''),
+                'method': endpoint.get('method', ''),
+                'description': endpoint.get('description', '')
+            })
+        
+        return saved_endpoints
     
     def get_api(self, doc_id: str) -> Optional[Dict[str, Any]]:
         """获取 API 信息"""

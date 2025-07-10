@@ -84,10 +84,10 @@ class ApiManager:
         
         with self.db_manager.get_cursor() as cursor:
             cursor.execute('''
-                INSERT INTO openapi_templates 
-                (id, name, content, status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (template_id, name, openapi_content, 'active', now, now))
+                INSERT INTO api_spec_templates 
+                (id, name, spec_type, content, version, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (template_id, name, 'openapi', openapi_content, '3.0.0', 'active', now, now))
         
         return template_id
     
@@ -109,9 +109,9 @@ class ApiManager:
         with self.db_manager.get_cursor() as cursor:
             cursor.execute('''
                 INSERT INTO api_documents 
-                (id, template_id, name, version, base_url, status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (document_id, template_id, doc_name, doc_version, base_url, 'active', now, now))
+                (id, template_id, name, spec_type, version, base_url, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (document_id, template_id, doc_name, 'openapi', doc_version, base_url, 'active', now, now))
         
         return document_id
     
@@ -128,21 +128,22 @@ class ApiManager:
             with self.db_manager.get_cursor() as cursor:
                 cursor.execute('''
                     INSERT INTO api_endpoints 
-                    (id, api_document_id, path, method, operation_id, summary, description, 
-                     tags, status, call_count, success_count, error_count, avg_response_time_ms, 
-                     created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, api_document_id, endpoint_name, endpoint_type, method, operation_type, description, 
+                     parameters, request_schema, response_schema, security, status, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     endpoint_id,
                     document_id,
                     endpoint['path'],
+                    'http',
                     endpoint['method'],
-                    endpoint['operation_id'],
+                    endpoint['method'].lower(),
                     endpoint['summary'],
-                    endpoint['description'],
-                    json.dumps(endpoint['tags']) if endpoint['tags'] else None,
+                    json.dumps(endpoint.get('parameters', [])),
+                    json.dumps(endpoint.get('request_schema', {})),
+                    json.dumps(endpoint.get('response_schema', {})),
+                    json.dumps(endpoint.get('security', [])),
                     'active',
-                    0, 0, 0, None,
                     now, now
                 ))
             
@@ -162,7 +163,7 @@ class ApiManager:
             cursor.execute('''
                 SELECT d.*, t.name as template_name, t.content as openapi_content
                 FROM api_documents d
-                JOIN openapi_templates t ON d.template_id = t.id
+                JOIN api_spec_templates t ON d.template_id = t.id
                 WHERE d.id = ?
             ''', (api_id,))
             
@@ -177,7 +178,7 @@ class ApiManager:
             cursor.execute('''
                 SELECT d.*, t.name as template_name
                 FROM api_documents d
-                JOIN openapi_templates t ON d.template_id = t.id
+                JOIN api_spec_templates t ON d.template_id = t.id
                 WHERE d.status = ?
                 ORDER BY d.created_at DESC
             ''', (status,))
